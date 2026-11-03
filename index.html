@@ -1,0 +1,766 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>縦書き変換・原稿用紙メーカー</title>
+<style>
+  :root{
+    --bg:#f3f1ea;
+    --panel:#ffffff;
+    --ink:#211f1a;
+    --sub:#716c5f;
+    --line:#ddd7c6;
+    --accent:#8a2f27;
+    --cell:#fffdf7;
+    --grid-line:#d7d2e0;
+    --mono:"Zen Kaku Gothic New","Noto Sans JP",system-ui,sans-serif;
+    --serif:"Shippori Mincho","Noto Serif JP",serif;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#17150f;
+      --panel:#211e17;
+      --ink:#eae6d9;
+      --sub:#a39d8a;
+      --line:#3a3627;
+      --accent:#d98d7f;
+      --cell:#1b1811;
+      --grid-line:#45434f;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#17150f;
+    --panel:#211e17;
+    --ink:#eae6d9;
+    --sub:#a39d8a;
+    --line:#3a3627;
+    --accent:#d98d7f;
+    --cell:#1b1811;
+    --grid-line:#45434f;
+    color-scheme: dark;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--ink);
+    font-family:var(--mono);
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{
+    max-width:1180px;
+    margin:0 auto;
+    padding:28px 16px 72px;
+  }
+  header{margin-bottom:22px;}
+  h1{
+    font-family:var(--serif);
+    font-size:clamp(20px,3vw,26px);
+    margin:0 0 6px;
+    letter-spacing:.01em;
+  }
+  .lead{
+    color:var(--sub);
+    font-size:13px;
+    margin:0;
+    line-height:1.7;
+    max-width:62ch;
+  }
+
+  .layout{
+    display:grid;
+    grid-template-columns:340px 1fr;
+    gap:18px;
+    align-items:start;
+    min-width:0;
+  }
+  .layout > *{min-width:0;}
+  @media (max-width:860px){
+    .layout{grid-template-columns:1fr;}
+  }
+
+  .panel{
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:4px;
+    padding:18px;
+    min-width:0;
+  }
+  .panel + .panel{margin-top:14px;}
+  .panel h2{
+    font-size:11px;
+    letter-spacing:.08em;
+    margin:0 0 12px;
+    color:var(--sub);
+    font-weight:600;
+    text-transform:uppercase;
+  }
+
+  textarea{
+    width:100%;
+    min-height:130px;
+    resize:vertical;
+    border:1px solid var(--line);
+    border-radius:3px;
+    padding:10px 12px;
+    font-size:14px;
+    line-height:1.8;
+    background:var(--cell);
+    color:var(--ink);
+    font-family:inherit;
+  }
+  textarea:focus-visible, button:focus-visible, input:focus-visible{
+    outline:2px solid var(--accent);
+    outline-offset:1px;
+  }
+  .row{
+    display:flex;
+    gap:8px;
+    align-items:center;
+    margin-top:10px;
+    flex-wrap:wrap;
+    justify-content:space-between;
+  }
+  .btns{display:flex;gap:8px;flex-wrap:wrap;}
+  button{
+    appearance:none;
+    border:1px solid var(--line);
+    background:var(--panel);
+    color:var(--ink);
+    border-radius:3px;
+    padding:7px 14px;
+    font-size:12.5px;
+    cursor:pointer;
+    font-family:inherit;
+  }
+  button:hover{border-color:var(--accent);color:var(--accent);}
+  button.primary{
+    background:var(--accent);
+    color:#fff;
+    border-color:var(--accent);
+  }
+  button.primary:hover{opacity:.9;color:#fff;}
+  .count{
+    font-size:11.5px;
+    color:var(--sub);
+    font-variant-numeric:tabular-nums;
+  }
+
+  fieldset{border:none;margin:0 0 16px;padding:0;}
+  fieldset:last-child{margin-bottom:0;}
+  legend{
+    font-size:12px;
+    color:var(--ink);
+    margin-bottom:8px;
+    padding:0;
+    font-weight:600;
+  }
+  .opts{display:flex;flex-direction:column;gap:7px;}
+  .opt{
+    display:flex;
+    align-items:flex-start;
+    gap:7px;
+    font-size:12.5px;
+    cursor:pointer;
+    line-height:1.5;
+    color:var(--ink);
+  }
+  .opt input{accent-color:var(--accent); margin-top:2px; flex-shrink:0;}
+  .custom-paper{
+    display:flex;
+    gap:8px;
+    align-items:center;
+    margin-top:8px;
+    font-size:12.5px;
+    flex-wrap:wrap;
+    color:var(--sub);
+  }
+  .custom-paper input[type=number]{
+    width:56px;
+    padding:4px 6px;
+    border:1px solid var(--line);
+    border-radius:3px;
+    background:var(--cell);
+    color:var(--ink);
+    font-family:inherit;
+    font-variant-numeric:tabular-nums;
+  }
+  .custom-paper.hidden{display:none;}
+  .checks{display:flex;flex-direction:column;gap:8px;}
+
+  .summary{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(90px,1fr));
+    gap:14px;
+    font-size:13px;
+    margin-bottom:10px;
+  }
+  .summary b{
+    font-size:19px;
+    font-variant-numeric:tabular-nums;
+    display:block;
+    font-family:var(--serif);
+  }
+  .sgroup{display:flex;flex-direction:column;gap:3px;}
+  .slabel{color:var(--sub);font-size:10.5px;letter-spacing:.04em;}
+  .notes{
+    font-size:11.5px;
+    color:var(--sub);
+    line-height:1.8;
+    border-top:1px solid var(--line);
+    padding-top:10px;
+  }
+  .tag{
+    display:inline-block;
+    background:var(--bg);
+    border:1px solid var(--line);
+    border-radius:3px;
+    padding:1px 6px;
+    margin-right:4px;
+    font-size:10.5px;
+    font-variant-numeric:tabular-nums;
+  }
+
+  .stage{min-width:0; overflow:hidden;}
+  #paperArea{
+    overflow-x:auto;
+    overflow-y:hidden;
+    padding:4px 0 10px;
+    max-width:100%;
+    -webkit-overflow-scrolling:touch;
+  }
+  .sheet-block{margin-bottom:22px;}
+  .sheet-label{
+    font-size:10.5px;
+    color:var(--sub);
+    margin-bottom:6px;
+    letter-spacing:.04em;
+  }
+  /* 用紙は幅いっぱいに広がり、マスは正方形のまま画面幅に合わせて伸縮する */
+  .sheet{
+    background:var(--cell);
+    border:1px solid var(--line);
+    border-radius:8px;
+    display:block;
+    width:100%;
+    max-width:calc(var(--lines) * 38px + 44px);
+    padding:22px;
+  }
+  .grid{
+    display:grid;
+    grid-auto-flow:column;
+    direction:ltr;
+    container-type:inline-size;
+    border-top:1px solid var(--grid-line);
+    border-left:1px solid var(--grid-line);
+  }
+  .col{
+    display:flex;
+    flex-direction:column;
+    min-width:0;
+  }
+  .cell{
+    width:100%;
+    aspect-ratio:1/1;
+    border-right:1px solid var(--grid-line);
+    border-bottom:1px solid var(--grid-line);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    writing-mode:vertical-rl;
+    font-size:calc(100cqw / var(--lines) * 0.58);
+    line-height:1;
+    position:relative;
+    background:var(--cell);
+    color:var(--ink);
+  }
+  .cell.tcy{text-combine-upright:all;}
+  .cell.empty{background:transparent;}
+  .cell.flag{color:var(--accent);}
+  .cell.flag::after{
+    content:"";
+    position:absolute;
+    top:3px;
+    left:3px;
+    width:4px;
+    height:4px;
+    border-radius:50%;
+    background:var(--accent);
+  }
+  .combo-span{font-size:62%;letter-spacing:0;}
+  .hang{
+    position:absolute;
+    top:100%;
+    left:0;
+    right:0;
+    display:flex;
+    justify-content:center;
+    color:var(--accent);
+  }
+
+  @media (max-width:480px){
+    .sheet{padding:12px;border-radius:6px;}
+  }
+
+  /* 印刷：設定欄を隠し、原稿用紙だけをA4縦で出す */
+  @media print{
+    body{background:#fff;}
+    .noprint{display:none !important;}
+    .wrap{padding:0;max-width:none;}
+    .layout{display:block;}
+    #paperArea{overflow:visible;padding:0;}
+    .sheet-block{margin:0;page-break-after:always;}
+    .sheet-label{display:none;}
+    .sheet{
+      border:none;
+      background:#fff;
+      padding:0;
+      display:block;
+      margin:0 auto;
+      width:100%;
+      max-width:min(182mm, calc(var(--lines) * 265mm / var(--cols)));
+      border-radius:0;
+    }
+    .cell{
+      border-color:#999;
+      background:#fff;
+      color:#000;
+    }
+    .cell.flag{color:#000;}
+    .cell.flag::after{display:none;}
+    @page{ size:A4 portrait; margin:14mm; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="noprint">
+    <h1>縦書き変換・原稿用紙メーカー</h1>
+    <p class="lead">文章を原稿用紙のマス目に縦書きで流し込みます。字数と行数を選べて、行頭に置けない文字をどう扱ったかも一覧で確認できます。入力はブラウザの中だけで組み直し、外部には送信しません。</p>
+  </header>
+
+  <div class="layout">
+    <div class="side noprint">
+      <div class="panel">
+        <h2>原稿用紙にしたい文章</h2>
+        <textarea id="inputText" maxlength="20000" placeholder="ここに文章を貼り付けてください"></textarea>
+        <div class="row">
+          <div class="btns">
+            <button id="sampleBtn">例文を入れる</button>
+            <button id="clearBtn">クリア</button>
+          </div>
+          <div class="count"><span id="charCount">0</span> / 20,000 文字</div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>用紙</h2>
+        <fieldset>
+          <div class="opts" id="paperOpts">
+            <label class="opt"><input type="radio" name="paper" value="20x20" checked>400字（20字×20行）</label>
+            <label class="opt"><input type="radio" name="paper" value="20x10">200字（20字×10行）</label>
+            <label class="opt"><input type="radio" name="paper" value="25x20">500字（25字×20行）</label>
+            <label class="opt"><input type="radio" name="paper" value="custom">自由に決める</label>
+          </div>
+          <div class="custom-paper hidden" id="customPaper">
+            1行 <input type="number" id="customCols" min="5" max="40" value="20">字 ×
+            <input type="number" id="customRows" min="2" max="40" value="20">行
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend>行の頭に置けない文字が来たとき</legend>
+          <div class="opts" id="kinsokuOpts">
+            <label class="opt"><input type="radio" name="kinsoku" value="oikomi" checked>行末のマスに一緒に入れる（学校で教わる形）</label>
+            <label class="opt"><input type="radio" name="kinsoku" value="hamidashi">マスの外（欄外）に出す（マスの使い方は上と同じ）</label>
+            <label class="opt"><input type="radio" name="kinsoku" value="okuri">直前の1マスごと次の行へ送る（書籍の組版で使う形）</label>
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend>半角の英数字</legend>
+          <div class="opts" id="hankakuOpts">
+            <label class="opt"><input type="radio" name="hankaku" value="zenkaku" checked>全角にそろえる（縦書きで正立する）</label>
+            <label class="opt"><input type="radio" name="hankaku" value="asis">そのまま（1文字1マス）（横倒しで表示）</label>
+            <label class="opt"><input type="radio" name="hankaku" value="tatechuyoko">2桁の数字を1マスに（縦中横）</label>
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend>短い行の文字位置</legend>
+          <div class="opts" id="valignOpts">
+            <label class="opt"><input type="radio" name="valign" value="top" checked>上揃え（行の上から詰める）</label>
+            <label class="opt"><input type="radio" name="valign" value="middle">中央揃え（行の中央に置く）</label>
+            <label class="opt"><input type="radio" name="valign" value="bottom">下揃え（行の下に寄せる）</label>
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend>そのほか</legend>
+          <div class="checks">
+            <label class="opt"><input type="checkbox" id="indentCheck" checked>段落の先頭を1マス下げる</label>
+            <label class="opt"><input type="checkbox" id="smallKanaCheck" checked>小さい「っ」「ゃ」も行の頭に置かない</label>
+          </div>
+        </fieldset>
+
+        <div class="row" style="margin-top:4px;">
+          <div class="btns">
+            <button id="copyBtn">本文をコピー</button>
+            <button class="primary" id="printBtn">印刷する</button>
+          </div>
+        </div>
+        <div class="count" id="copyStatus" aria-live="polite" style="margin-top:6px;"></div>
+      </div>
+
+      <div class="panel" id="summaryPanel" style="display:none;">
+        <h2>集計</h2>
+        <div class="summary" id="summaryBox"></div>
+        <div class="notes" id="notesBox"></div>
+      </div>
+    </div>
+
+    <div class="stage">
+      <div id="paperArea"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  const inputText = document.getElementById('inputText');
+  const charCount = document.getElementById('charCount');
+  const sampleBtn = document.getElementById('sampleBtn');
+  const clearBtn = document.getElementById('clearBtn');
+  const paperArea = document.getElementById('paperArea');
+  const summaryPanel = document.getElementById('summaryPanel');
+  const summaryBox = document.getElementById('summaryBox');
+  const notesBox = document.getElementById('notesBox');
+  const customPaper = document.getElementById('customPaper');
+  const customCols = document.getElementById('customCols');
+  const customRows = document.getElementById('customRows');
+  const indentCheck = document.getElementById('indentCheck');
+  const smallKanaCheck = document.getElementById('smallKanaCheck');
+  const copyBtn = document.getElementById('copyBtn');
+  const printBtn = document.getElementById('printBtn');
+  const copyStatus = document.getElementById('copyStatus');
+
+  function getValign(){
+    return document.querySelector('input[name=valign]:checked').value;
+  }
+
+  const SAMPLE = "あの日、空はどこまでも高く、静かな風が校庭の木々をそっと揺らしていた。\nわたしはノートを片手に、何から書き始めればよいのか迷っていた。\n「大丈夫、思ったとおりに書けばいい」そう先生が言ってくれた言葉を思い出す。\n2026年9月3日、わたしは初めて原稿用紙に向き合った。";
+
+  const KINSOKU_HEAD = new Set(['、','。','，','．','・','：','；','？','！','”','’','）','〉','》','」','』','】','〕','ー','―','‐','‥','…']);
+  const SMALL_KANA = new Set(['っ','ゃ','ゅ','ょ','ぁ','ぃ','ぅ','ぇ','ぉ','ッ','ャ','ュ','ョ','ァ','ィ','ゥ','ェ','ォ']);
+
+  function getSegmenter(){
+    if (typeof Intl !== 'undefined' && Intl.Segmenter) {
+      return new Intl.Segmenter('ja', { granularity: 'grapheme' });
+    }
+    return null;
+  }
+  const segmenter = getSegmenter();
+
+  function toGraphemes(str){
+    if (segmenter) return Array.from(segmenter.segment(str), s => s.segment);
+    return Array.from(str);
+  }
+
+  function toFullWidth(ch){
+    const code = ch.charCodeAt(0);
+    if (code >= 0x21 && code <= 0x7e) return String.fromCharCode(code + 0xFEE0);
+    if (ch === ' ') return '　';
+    return ch;
+  }
+
+  function isHalfWidthAlnum(ch){ return /^[0-9A-Za-z]$/.test(ch); }
+
+  function getPaperSize(){
+    const sel = document.querySelector('input[name=paper]:checked').value;
+    if (sel === '20x20') return {cols:20, rows:20};
+    if (sel === '20x10') return {cols:20, rows:10};
+    if (sel === '25x20') return {cols:25, rows:20};
+    let c = parseInt(customCols.value, 10) || 20;
+    let r = parseInt(customRows.value, 10) || 20;
+    c = Math.min(Math.max(c,5),40);
+    r = Math.min(Math.max(r,2),40);
+    return {cols:c, rows:r};
+  }
+
+  function buildCells(text, opts){
+    const paragraphs = text.split('\n');
+    const cells = [];
+    const stats = { chars:0, indent:0, hangOut:0, sentOver:0, halfToFull:0, tatechuyoko:0, kinsokuCount:0 };
+    const hankakuMode = opts.hankaku;
+
+    paragraphs.forEach((para, pi) => {
+      if (pi > 0) cells.push({type:'parabreak'});
+      let graphemes = toGraphemes(para);
+      let processed = [];
+      let i = 0;
+      while (i < graphemes.length) {
+        let ch = graphemes[i];
+        if (hankakuMode === 'tatechuyoko' && /^[0-9]$/.test(ch) && i+1 < graphemes.length && /^[0-9]$/.test(graphemes[i+1])) {
+          processed.push({ch: ch+graphemes[i+1], combo:true});
+          stats.tatechuyoko++;
+          i += 2;
+          continue;
+        }
+        if (isHalfWidthAlnum(ch)) {
+          if (hankakuMode === 'zenkaku' || hankakuMode === 'tatechuyoko') {
+            processed.push({ch: toFullWidth(ch), rot:false});
+            stats.halfToFull++;
+          } else {
+            processed.push({ch: ch, rot:true});
+          }
+        } else {
+          processed.push({ch: ch, rot:false});
+        }
+        i++;
+      }
+
+      let isFirstOfPara = true;
+      processed.forEach((item) => {
+        stats.chars += (item.combo ? 2 : 1);
+        let entry = { type:'char', ch:item.ch, rot:!!item.rot, combo:!!item.combo, indentMark:false };
+        if (isFirstOfPara && opts.indent) { entry.indentMark = true; stats.indent++; }
+        isFirstOfPara = false;
+        cells.push(entry);
+      });
+    });
+
+    return {cells, stats};
+  }
+
+  function layoutPaper(cells, cols, rows, opts, stats){
+    const kinsokuMode = opts.kinsoku;
+    let tokens = [];
+    cells.forEach(c => {
+      if (c.type === 'parabreak') { tokens.push({type:'break'}); return; }
+      if (c.indentMark) tokens.push({type:'blank'});
+      tokens.push({type:'char', ch:c.ch, rot:c.rot, combo:c.combo});
+    });
+
+    function isKinsokuHead(ch){
+      if (KINSOKU_HEAD.has(ch)) return true;
+      if (opts.smallKana && SMALL_KANA.has(ch)) return true;
+      return false;
+    }
+
+    let lines = [];
+    let cur = [];
+    for (let idx = 0; idx < tokens.length; idx++) {
+      let tok = tokens[idx];
+      if (tok.type === 'break') { lines.push(cur); cur = []; continue; }
+      cur.push(tok);
+      if (cur.length >= cols) {
+        let next = tokens[idx+1];
+        if (next && next.type === 'char' && isKinsokuHead(next.ch)) {
+          if (kinsokuMode === 'oikomi') {
+            cur[cur.length-1] = {type:'combined', main: cur[cur.length-1], extra: next};
+            idx++;
+            stats.hangOut++; stats.kinsokuCount++;
+          } else if (kinsokuMode === 'hamidashi') {
+            cur.push({type:'overflow', ch: next.ch, rot: next.rot});
+            idx++;
+            stats.hangOut++; stats.kinsokuCount++;
+          } else if (kinsokuMode === 'okuri') {
+            let moved = cur.pop();
+            lines.push(cur);
+            cur = [moved];
+            stats.sentOver++; stats.kinsokuCount++;
+            continue;
+          }
+        }
+        lines.push(cur);
+        cur = [];
+      }
+    }
+    if (cur.length) lines.push(cur);
+
+    let pages = [];
+    let pageLines = [];
+    let lineCountOnPage = 0;
+    lines.forEach(l => {
+      if (lineCountOnPage >= rows) { pages.push(pageLines); pageLines = []; lineCountOnPage = 0; }
+      pageLines.push(l);
+      lineCountOnPage++;
+    });
+    if (pageLines.length) pages.push(pageLines);
+    if (pages.length === 0) pages.push([[]]);
+    return pages;
+  }
+
+  function renderPaper(pages, cols, rows, valign){
+    paperArea.innerHTML = '';
+    pages.forEach((pageLines, pageIdx) => {
+      const sheetBlock = document.createElement('div');
+      sheetBlock.className = 'sheet-block';
+      const label = document.createElement('div');
+      label.className = 'sheet-label';
+      label.textContent = `${pageIdx+1} 枚目（${cols} 字 × ${rows} 行）`;
+      sheetBlock.appendChild(label);
+
+      const sheet = document.createElement('div');
+      sheet.className = 'sheet';
+      sheet.style.setProperty('--cols', cols);
+      sheet.style.setProperty('--lines', rows);
+      const grid = document.createElement('div');
+      grid.className = 'grid';
+      grid.style.gridTemplateColumns = `repeat(${rows}, 1fr)`;
+
+      // 縦書きは右の列から左へ進む。1行目を一番右に置くため、左端の列から逆順に作る
+      for (let li = rows - 1; li >= 0; li--) {
+        const lineTokens = pageLines[li] || [];
+        const col = document.createElement('div');
+        col.className = 'col';
+
+        // 短い行は、列の中で上揃え・中央揃え・下揃えに寄せる
+        const len = Math.min(lineTokens.length, cols);
+        let offset = 0;
+        if (valign === 'bottom') offset = cols - len;
+        else if (valign === 'middle') offset = Math.floor((cols - len) / 2);
+
+        let lastCell = null;
+        for (let ci = 0; ci < cols; ci++) {
+          const tok = ci >= offset ? lineTokens[ci - offset] : undefined;
+          const cell = document.createElement('div');
+          cell.className = 'cell';
+          if (!tok) {
+            cell.classList.add('empty');
+          } else if (tok.type === 'blank') {
+            // 字下げ
+          } else if (tok.type === 'char') {
+            cell.textContent = tok.ch;
+            if (tok.combo) cell.classList.add('tcy');
+          } else if (tok.type === 'combined') {
+            const mainCh = tok.main.type === 'char' ? tok.main.ch : '';
+            const span = document.createElement('span');
+            span.className = 'combo-span';
+            span.textContent = mainCh + tok.extra.ch;
+            cell.appendChild(span);
+            cell.classList.add('flag');
+          } else if (tok.type === 'overflow') {
+            cell.textContent = tok.ch;
+            cell.classList.add('flag');
+          }
+          col.appendChild(cell);
+          lastCell = cell;
+        }
+        // 欄外に出す禁則文字は、列の最後のマスの外側に表示する
+        const extra = lineTokens[cols];
+        if (extra && extra.type === 'overflow' && lastCell) {
+          const hang = document.createElement('span');
+          hang.className = 'hang';
+          hang.textContent = extra.ch;
+          lastCell.appendChild(hang);
+        }
+        grid.appendChild(col);
+      }
+
+      sheet.appendChild(grid);
+      sheetBlock.appendChild(sheet);
+      paperArea.appendChild(sheetBlock);
+    });
+  }
+
+  function render(){
+    const text = inputText.value;
+    charCount.textContent = text.length;
+
+    const opts = {
+      kinsoku: document.querySelector('input[name=kinsoku]:checked').value,
+      hankaku: document.querySelector('input[name=hankaku]:checked').value,
+      indent: indentCheck.checked,
+      smallKana: smallKanaCheck.checked
+    };
+
+    const {cols, rows} = getPaperSize();
+
+    if (!text.trim()) {
+      summaryPanel.style.display = 'none';
+      renderPaper([[[]]], cols, rows, getValign());
+      return;
+    }
+
+    const {cells, stats} = buildCells(text, opts);
+    const pages = layoutPaper(cells, cols, rows, opts, stats);
+    renderPaper(pages, cols, rows, getValign());
+
+    const perPage = cols * rows;
+    let usedCells = 0;
+    pages.forEach(p => p.forEach(l => usedCells += l.length));
+    const totalCapacity = pages.length * perPage;
+    const empty = totalCapacity - usedCells;
+
+    summaryPanel.style.display = '';
+    summaryBox.innerHTML = `
+      <div class="sgroup"><span class="slabel">文字数</span><b>${stats.chars.toLocaleString()}</b></div>
+      <div class="sgroup"><span class="slabel">枚数</span><b>${pages.length}</b></div>
+      <div class="sgroup"><span class="slabel">使用マス</span><b>${usedCells.toLocaleString()}</b></div>
+      <div class="sgroup"><span class="slabel">空きマス</span><b>${empty.toLocaleString()}</b></div>
+    `;
+
+    let noteParts = [];
+    noteParts.push(`<span class="tag">文字数 ${stats.chars}</span>＋<span class="tag">字下げ ${stats.indent}</span>−<span class="tag">ぶら下げ ${stats.hangOut}</span>＝使用マス ${usedCells}`);
+    if (stats.kinsokuCount > 0) {
+      const modeLabel = opts.kinsoku === 'oikomi' ? '行末に同居' : opts.kinsoku === 'hamidashi' ? '欄外に出す' : '次行送り';
+      noteParts.push(`行頭禁則の処理：${stats.kinsokuCount} 件（${modeLabel}）`);
+    }
+    if (stats.halfToFull > 0) noteParts.push(`半角→全角に変換：${stats.halfToFull} 件`);
+    if (stats.tatechuyoko > 0) noteParts.push(`縦中横（2桁数字）：${stats.tatechuyoko} 件`);
+    notesBox.innerHTML = noteParts.join('<br>');
+  }
+
+  inputText.addEventListener('input', render);
+  document.querySelectorAll('input[name=paper]').forEach(r => {
+    r.addEventListener('change', () => {
+      customPaper.classList.toggle('hidden', document.querySelector('input[name=paper]:checked').value !== 'custom');
+      render();
+    });
+  });
+  customCols.addEventListener('input', render);
+  customRows.addEventListener('input', render);
+  document.querySelectorAll('input[name=kinsoku]').forEach(r => r.addEventListener('change', render));
+  document.querySelectorAll('input[name=hankaku]').forEach(r => r.addEventListener('change', render));
+  indentCheck.addEventListener('change', render);
+  smallKanaCheck.addEventListener('change', render);
+  document.querySelectorAll('input[name=valign]').forEach(r => r.addEventListener('change', render));
+
+  sampleBtn.addEventListener('click', () => { inputText.value = SAMPLE; render(); });
+  clearBtn.addEventListener('click', () => { inputText.value = ''; render(); });
+
+  async function copyText(){
+    const text = inputText.value;
+    if (!text) {
+      copyStatus.textContent = 'コピーする文章がありません';
+      setTimeout(() => copyStatus.textContent = '', 2000);
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(text);
+      copyStatus.textContent = 'コピーしました';
+    } catch (e) {
+      inputText.focus();
+      inputText.select();
+      try {
+        document.execCommand('copy');
+        copyStatus.textContent = 'コピーしました';
+      } catch (e2) {
+        copyStatus.textContent = '文章を選択しました。Ctrl+C（Macは⌘+C）でコピーしてください';
+      }
+    }
+    setTimeout(() => copyStatus.textContent = '', 3000);
+  }
+  copyBtn.addEventListener('click', copyText);
+
+  printBtn.addEventListener('click', () => { window.print(); });
+
+  render();
+})();
+</script>
+</body>
+</html>
